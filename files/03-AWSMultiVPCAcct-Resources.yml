@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: Creates 1 custom VPC With 1 EC2 instance in each VPC.
+Description: Creates 2 custom VPC With 1 EC2 instance in each VPC.
 Parameters:
   InstanceTypeParameter:
     Type: String
@@ -18,6 +18,13 @@ Mappings:
       CIDR: 10.0.0.0/24
     Public2:
       CIDR: 10.0.1.0/24
+  Subnet2Config:
+    VPC2:
+      CIDR: 10.1.0.0/16
+    Public1:
+      CIDR: 10.1.0.0/24
+    Public2:
+      CIDR: 10.1.1.0/24
 Resources:
   VPC1:
     Type: 'AWS::EC2::VPC'
@@ -30,7 +37,19 @@ Resources:
         - CIDR
       Tags:
         - Key: Name
-          Value: VCAN_VPC
+          Value: VCAN_VPC1
+  VPC2:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      CidrBlock: !FindInMap
+        - Subnet2Config
+        - VPC2
+        - CIDR
+      Tags:
+        - Key: Name
+          Value: VCAN_VPC2
   VPC1PublicSubnet1:
     Type: 'AWS::EC2::Subnet'
     Properties:
@@ -45,7 +64,7 @@ Resources:
         - CIDR
       Tags:
         - Key: Name
-          Value: VCAN_PUBLIC_1
+          Value: VCAN_VPC1_PUBLIC_1
   VPC1PublicSubnet2:
     Type: 'AWS::EC2::Subnet'
     Properties:
@@ -60,25 +79,73 @@ Resources:
         - CIDR
       Tags:
         - Key: Name
-          Value: VCAN_PUBLIC_2
+          Value: VCAN_VPC1_PUBLIC_2
+  VPC2PublicSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC2
+      AvailabilityZone: !Select 
+        - '0'
+        - !GetAZs us-east-1
+      MapPublicIpOnLaunch: 'true'
+      CidrBlock: !FindInMap 
+        - Subnet2Config
+        - Public1
+        - CIDR
+      Tags:
+        - Key: Name
+          Value: VCAN_VPC2_PUBLIC_1
+  VPC2PublicSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC2
+      AvailabilityZone: !Select 
+        - '1'
+        - !GetAZs us-east-1
+      MapPublicIpOnLaunch: 'true'
+      CidrBlock: !FindInMap 
+        - Subnet2Config
+        - Public2
+        - CIDR
+      Tags:
+        - Key: Name
+          Value: VCAN_VPC2_PUBLIC_2
   InternetGateway1:
     Type: 'AWS::EC2::InternetGateway'
     Properties:
       Tags:
         - Key: Name
-          Value: VCAN_IGW
+          Value: VCAN_IGW1
   GatewayToInternet1:
     Type: 'AWS::EC2::VPCGatewayAttachment'
     Properties:
       VpcId: !Ref VPC1
       InternetGatewayId: !Ref InternetGateway1
+  InternetGateway2:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: VCAN_IGW2
+  GatewayToInternet2:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref VPC2
+      InternetGatewayId: !Ref InternetGateway2
   PublicRouteTable1:
     Type: 'AWS::EC2::RouteTable'
     Properties:
       VpcId: !Ref VPC1
       Tags:
         - Key: Name
-          Value: VCAN_VPC
+          Value: VCAN_VPC1
+  PublicRouteTable2:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC2
+      Tags:
+        - Key: Name
+          Value: VCAN_VPC2
   PublicRoute1:
     Type: 'AWS::EC2::Route'
     DependsOn: GatewayToInternet1
@@ -86,6 +153,13 @@ Resources:
       RouteTableId: !Ref PublicRouteTable1
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway1
+  PublicRoute2:
+    Type: 'AWS::EC2::Route'
+    DependsOn: GatewayToInternet2
+    Properties:
+      RouteTableId: !Ref PublicRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway2
   PublicSubnet1RouteTableAssociation1:
     Type: 'AWS::EC2::SubnetRouteTableAssociation'
     Properties:
@@ -96,17 +170,46 @@ Resources:
     Properties:
       SubnetId: !Ref VPC1PublicSubnet2
       RouteTableId: !Ref PublicRouteTable1
+  PublicSubnet2RouteTableAssociation1:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref VPC2PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable2
+  PublicSubnet2RouteTableAssociation2:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref VPC2PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable2
   PublicNetworkAcl1:
     Type: 'AWS::EC2::NetworkAcl'
     Properties:
       VpcId: !Ref VPC1
       Tags:
         - Key: Name
-          Value: IronCityNACL
+          Value: IronCityNACL1
+  PublicNetworkAcl2:
+    Type: 'AWS::EC2::NetworkAcl'
+    Properties:
+      VpcId: !Ref VPC2
+      Tags:
+        - Key: Name
+          Value: IronCityNACL2
   InboundHTTPPublicNetworkAcl1Entry:
     Type: 'AWS::EC2::NetworkAclEntry'
     Properties:
       NetworkAclId: !Ref PublicNetworkAcl1
+      RuleNumber: '100'
+      Protocol: '6'
+      RuleAction: allow
+      Egress: 'false'
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: '80'
+        To: '80'
+  InboundHTTPPublicNetworkAcl2Entry:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl2
       RuleNumber: '100'
       Protocol: '6'
       RuleAction: allow
@@ -127,10 +230,34 @@ Resources:
       PortRange:
         From: '443'
         To: '443'
+  InboundHTTPSPublicNetworkAcl2Entry:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl2
+      RuleNumber: '101'
+      Protocol: '6'
+      RuleAction: allow
+      Egress: 'false'
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: '443'
+        To: '443'
   InboundSSHPublicNetworkAcl1Entry:
     Type: 'AWS::EC2::NetworkAclEntry'
     Properties:
       NetworkAclId: !Ref PublicNetworkAcl1
+      RuleNumber: '102'
+      Protocol: '6'
+      RuleAction: allow
+      Egress: 'false'
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: '22'
+        To: '22'
+  InboundSSHPublicNetworkAcl2Entry:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl2
       RuleNumber: '102'
       Protocol: '6'
       RuleAction: allow
@@ -151,10 +278,34 @@ Resources:
       PortRange:
         From: '1024'
         To: '65535'
+  InboundEmphemeralPublicNetworkAcl2Entry:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl2
+      RuleNumber: '103'
+      Protocol: '6'
+      RuleAction: allow
+      Egress: 'false'
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: '1024'
+        To: '65535'
   OutboundPublicNetworkAcl1Entry:
     Type: 'AWS::EC2::NetworkAclEntry'
     Properties:
       NetworkAclId: !Ref PublicNetworkAcl1
+      RuleNumber: '100'
+      Protocol: '6'
+      RuleAction: allow
+      Egress: 'true'
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: '0'
+        To: '65535'
+  OutboundPublicNetworkAcl2Entry:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl2
       RuleNumber: '100'
       Protocol: '6'
       RuleAction: allow
@@ -173,6 +324,16 @@ Resources:
     Properties:
       SubnetId: !Ref VPC1PublicSubnet2
       NetworkAclId: !Ref PublicNetworkAcl1
+  PublicSubnet2NetworkAclAssociation1:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId: !Ref VPC2PublicSubnet1
+      NetworkAclId: !Ref PublicNetworkAcl2
+  PublicSubnet2NetworkAclAssociation2:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId: !Ref VPC2PublicSubnet2
+      NetworkAclId: !Ref PublicNetworkAcl2
   EC2Instance1:
     Type: 'AWS::EC2::Instance'
     Properties:
@@ -206,7 +367,41 @@ Resources:
           SubnetId: !Ref VPC1PublicSubnet1
       Tags:
         - Key: Name
-          Value: MyInstance
+          Value: MyInstanceVPC1
+  EC2Instance2:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: !Ref InstanceTypeParameter
+      ImageId: 'ami-0b0dcb5067f052a63'
+      UserData: 
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash
+            'echo ''cloud_user:%password%'' | chpasswd'
+            yum install -y httpd
+            systemctl start httpd
+            systemctl enable httpd
+            echo "<html><h1>Instance Data</h1><h3>Availability Zone: " > /var/www/html/index.html
+            curl http://169.254.169.254/latest/meta-data/placement/availability-zone >> /var/www/html/index.html
+            echo "</h3><h3>Instance Id: " >> /var/www/html/index.html
+            curl http://169.254.169.254/latest/meta-data/instance-id >> /var/www/html/index.html
+            echo "</h3><h3>Public IP: " >> /var/www/html/index.html
+            curl http://169.254.169.254/latest/meta-data/public-ipv4 >> /var/www/html/index.html
+            echo "</h3><h3>Local IP: " >> /var/www/html/index.html
+            curl http://169.254.169.254/latest/meta-data/local-ipv4 >> /var/www/html/index.html
+            echo "</h3></html> " >> /var/www/html/index.html
+            echo 'setup done.' > /home/cloud_user/status
+            'chown cloud_user:cloud_user /home/cloud_user/status'
+      NetworkInterfaces:
+        - GroupSet:
+            - !Ref EC2SecurityGroup2
+          AssociatePublicIpAddress: 'true'
+          DeviceIndex: '0'
+          DeleteOnTermination: 'true'
+          SubnetId: !Ref VPC2PublicSubnet1
+      Tags:
+        - Key: Name
+          Value: MyInstanceVPC2          
   EC2SecurityGroup1:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
@@ -221,7 +416,26 @@ Resources:
           FromPort: 80
           ToPort: 80
           IpProtocol: tcp
-      GroupName: VCAN_SG
+      GroupName: VCAN_SG1
       Tags:
         - Key: Name
-          Value: VCAN_SG
+          Value: VCAN_SG1
+  EC2SecurityGroup2:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: EC2SecurityGroupPublic
+      VpcId: !Ref VPC2
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 22
+          ToPort: 22
+          IpProtocol: tcp
+        - CidrIp: 0.0.0.0/0
+          FromPort: 80
+          ToPort: 80
+          IpProtocol: tcp
+      GroupName: VCAN_SG2
+      Tags:
+        - Key: Name
+          Value: VCAN_SG2
+
