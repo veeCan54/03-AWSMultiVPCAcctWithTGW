@@ -3,12 +3,10 @@ Description: Creates 3 custom VPC With 2 Subnets in each AZ.  1 subnet has 1 EC2
 Parameters:
   InstanceTypeParameter:
     Type: String
-    Default: t3.micro
+    Default: t2.micro
     AllowedValues:
-      - t3.micro
-      - t3.small
-      - t3.medium
-      - t3.large
+      - t2.micro
+      - t2.small
     Description: "Select an instance type."
 Mappings:
   Subnet1Config:
@@ -33,6 +31,23 @@ Mappings:
     Public2:
       CIDR: 10.2.1.0/24
 Resources:
+  InstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Roles:
+        - !Ref SSMRole
+  SSMRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'
   VPC1:
     Type: 'AWS::EC2::VPC'
     Properties:
@@ -500,6 +515,7 @@ Resources:
     Properties:
       InstanceType: !Ref InstanceTypeParameter
       ImageId: 'ami-0b0dcb5067f052a63'
+      IamInstanceProfile: !Ref InstanceProfile
       UserData: 
         Fn::Base64:
           !Sub |
@@ -534,6 +550,7 @@ Resources:
     Properties:
       InstanceType: !Ref InstanceTypeParameter
       ImageId: 'ami-0b0dcb5067f052a63'
+      IamInstanceProfile: !Ref InstanceProfile
       UserData: 
         Fn::Base64:
           !Sub |
@@ -568,6 +585,7 @@ Resources:
     Properties:
       InstanceType: !Ref InstanceTypeParameter
       ImageId: 'ami-0b0dcb5067f052a63'
+      IamInstanceProfile: !Ref InstanceProfile
       UserData: 
         Fn::Base64:
           !Sub |
@@ -611,6 +629,10 @@ Resources:
           FromPort: 80
           ToPort: 80
           IpProtocol: tcp
+        - CidrIp: 10.0.0.0/8
+          FromPort: -1
+          ToPort: -1
+          IpProtocol: icmp
       GroupName: VCAN_SG1
       Tags:
         - Key: Name
@@ -629,6 +651,10 @@ Resources:
           FromPort: 80
           ToPort: 80
           IpProtocol: tcp
+        - CidrIp: 10.0.0.0/8
+          FromPort: -1
+          ToPort: -1
+          IpProtocol: icmp
       GroupName: VCAN_SG2
       Tags:
         - Key: Name
@@ -647,6 +673,10 @@ Resources:
           FromPort: 80
           ToPort: 80
           IpProtocol: tcp
+        - CidrIp: 10.0.0.0/8
+          FromPort: -1
+          ToPort: -1
+          IpProtocol: icmp
       GroupName: VCAN_SG3
       Tags:
         - Key: Name
