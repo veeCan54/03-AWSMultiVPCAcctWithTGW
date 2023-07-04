@@ -7,7 +7,7 @@ This is what it will look like after the 3 VPCs are set up.
 ![Alt text](https://github.com/veeCan54/03-AWSMultiVPCAcctWithTGW/blob/main/images/architecture.png)
 
 The Hands on lab instructed to create the VPCs and configure them manually using the [AWS admin console](https://aws.amazon.com/console/). 
-I decided to get some more practice with [CloudFormation](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#) so that is what I used. [The template is here](https://github.com/veeCan54/03-AWSMultiVPCAcctWithTGW/blob/files/03-AWSMultiVPCAcct-Resources.yml). 
+I decided to get some more practice with [CloudFormation](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#) so that is what I used. [The template is here](https://github.com/veeCan54/03-AWSMultiVPCAcctWithTGW/blob/main/files/03-AWSMultiVPCAcct-Resources.yml). 
 The security groups have been configured with rules to allow incoming ICMP traffic to EC2 instances. The EC2 Instances have an Instance profile with a Role attached to it. This Role lets us connect to the EC2 instance using SSM. 
 
 Let us examine the current architecture. By default, EC2 instances in different VPCs are not able to communicate with EC2 instances in other VPCs using their private IP addresses.
